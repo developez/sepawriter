@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Perrich.SepaWriter
 {
@@ -16,6 +16,11 @@ namespace Perrich.SepaWriter
         ///     Unique identification, as assigned by the debtor, to unambiguously identify the mandate.
         /// </summary>
         public string MandateIdentification { get; set; }
+
+        /// <summary>
+        ///     Private identification, to unambiguously identify the mandate.
+        /// </summary>
+        public string PrivateIdentification { get; set; }        
 
         /// <summary>
         ///     Sequence Type (default is "OOFF")
