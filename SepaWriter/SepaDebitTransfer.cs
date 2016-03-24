@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
@@ -28,7 +28,17 @@ namespace Perrich.SepaWriter
         public SepaDebitTransfer()
         {
             CreditorAccountCurrency = Constant.EuroCurrency;
-            LocalInstrumentCode = "CORE";
+            LocalInstrumentCode = Constant.LocalInstrumentCode_CoreDirectDebitCode;
+            schema = SepaSchema.Pain00800102;
+        }
+
+        /// <summary>
+        /// Create a Sepa Debit Transfer using Pain.008.001.02 schema
+        /// </summary>
+        public SepaDebitTransfer(String LocalInstrumentsCode)
+        {
+            CreditorAccountCurrency = Constant.EuroCurrency;
+            LocalInstrumentCode = LocalInstrumentsCode;
             schema = SepaSchema.Pain00800102;
         }
 
@@ -95,6 +105,18 @@ namespace Perrich.SepaWriter
             grpHdr.NewElement("InitgPty").NewElement("Nm", InitiatingPartyName);
             if (InitiatingPartyId != null)
                 XmlUtils.GetFirstElement(xml, "CstmrDrctDbtInitn//InitgPty").NewElement("Id", InitiatingPartyId);
+            else if (InitiatingPartyIdWithOrgId != null)
+            {
+                XmlUtils.GetFirstElement(xml, "CstmrDrctDbtInitn//InitgPty")
+                        .NewElement("Id")
+                        .NewElement("OrgId")
+                        .NewElement("Othr")
+                        .NewElement("Id", InitiatingPartyIdWithOrgId);
+
+                XmlUtils.GetFirstElement(xml, "CstmrDrctDbtInitn//InitgPty//Id//OrgId//Othr")
+                        .NewElement("SchmeNm")
+                        .NewElement("Cd", "COR1");
+            }
 
             // Part 2: Payment Information for each Sequence Type.
             foreach (SepaSequenceType seqTp in Enum.GetValues(typeof(SepaSequenceType)))
@@ -153,6 +175,15 @@ namespace Perrich.SepaWriter
 
             pmtInf.NewElement("ReqdColltnDt", StringUtils.FormatDate(RequestedExecutionDate));
             pmtInf.NewElement("Cdtr").NewElement("Nm", Creditor.Name);
+            if(Creditor.Country != null)
+            {
+                XmlElement pstl_adr = XmlUtils.GetFirstElement(pmtInf, "Cdtr").NewElement("PstlAdr");
+                pstl_adr.NewElement("Ctry", Creditor.Country);
+                foreach(String address_line in Creditor.AddressLines)
+                {
+                    pstl_adr.NewElement("AdrLine", address_line);
+                }
+            }
 
             var dbtrAcct = pmtInf.NewElement("CdtrAcct");
             dbtrAcct.NewElement("Id").NewElement("IBAN", Creditor.Iban);
@@ -189,7 +220,26 @@ namespace Perrich.SepaWriter
             mndtRltdInf.NewElement("DtOfSgntr", StringUtils.FormatDate(transfer.DateOfSignature));
 
             XmlUtils.CreateBic(cdtTrfTxInf.NewElement("DbtrAgt"), transfer.Debtor);
-            cdtTrfTxInf.NewElement("Dbtr").NewElement("Nm", transfer.Debtor.Name);
+            //cdtTrfTxInf.NewElement("Dbtr").NewElement("Nm", transfer.Debtor.Name);
+            XmlElement Dbtr = cdtTrfTxInf.NewElement("Dbtr");
+            Dbtr.NewElement("Nm", transfer.Debtor.Name);
+            if (transfer.Debtor.Country != null)
+            {
+                XmlElement pstl_adr = Dbtr.NewElement("PstlAdr");
+                pstl_adr.NewElement("Ctry", transfer.Debtor.Country);
+                foreach (String address_line in transfer.Debtor.AddressLines)
+                {
+                    pstl_adr.NewElement("AdrLine", address_line);
+                }
+            }
+            if (transfer.PrivateIdentification != null)
+            {
+                var Othr = Dbtr.NewElement("Id").NewElement("PrvtId").NewElement("Othr");
+                Othr.NewElement("Id", transfer.PrivateIdentification);
+                Othr.NewElement("SchmeNm")
+                    .NewElement("Prtry", "SEPA");
+            }
+
             cdtTrfTxInf.NewElement("DbtrAcct").NewElement("Id").NewElement("IBAN", transfer.Debtor.Iban);
 
             if (!string.IsNullOrEmpty(transfer.RemittanceInformation))
